@@ -1,0 +1,3 @@
+rootProject.name='SEAL'
+include ':app'
+include ':imseal'
