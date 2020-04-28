@@ -17,11 +17,8 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Log.d("Test", "got here!");
-
-
         imseal = new IMSEAL();
-        imseal.initialize("hello world");
+        imseal.initialize("hello world", "380000");
         imseal.recordAdLoaded();
 
         Log.d("Test", "got here!");

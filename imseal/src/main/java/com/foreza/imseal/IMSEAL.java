@@ -7,51 +7,33 @@ import org.json.JSONObject;
 
 import java.util.Date;
 
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+import retrofit2.converter.gson.GsonConverterFactory;
+
 public class IMSEAL {
 
-
-    private static final String logTag = "IMSEAL";
-
-
+    private static final String logTag = "[IMSEAL]";
 
     String sessionId = null;
     boolean isInitialized = false;
-
     JSONObject localParams;
     IMSEALInterface listener;                                           // TODO: Plug in
 
-
     private String _currentEventId;
-    private String _currentPrimaryAPIRemote;
-
-    private String _currentLocationAPIRemote;
+    private EndpointConfigs configs;
 
 
     public IMSEAL () {
     }
 
-    public void initialize(String uuid){
-
-        // TODO: Make API call to remote to fetch IP.
-
-        try {
-            localParams = new JSONObject();
-            localParams.put("device_id", "123456789");
-            localParams.put("isActive", true);
-            localParams.put("cellular", false);
-            localParams.put("os", "Android");
-            localParams.put("request_ip", "123.123.123.123");
-            localParams.put("continent", "");
-            localParams.put("country", "xxx");
-            localParams.put("city", "xxx");
-            localParams.put("lat", "xxx");
-            localParams.put("long", "xxx");
-            localParams.put("date_created", new Date());
-
-        } catch (JSONException e){
-            // Handle error
-        }
-
+    public void initialize(String uuid, String plc){
+        initializeLocalParamsBaseObject(uuid);
+        updateLocalParamsWithPlacementID(plc);
+        updateLocalParamsFromRemote();
 
     }
 
@@ -63,8 +45,6 @@ public class IMSEAL {
 
     // GETTERs TODO: Add more getters
 
-
-
     public String getPlacementID() {
 
         try {
@@ -75,19 +55,15 @@ public class IMSEAL {
 
     }
 
-
-
     // Setters (TODO: Add additional settings for the local params)
 
-    public void setPlacementID(String plc){
+    public void updateLocalParamsWithPlacementID(String plc){
         try {
             localParams.put("placement_id", plc);
         } catch (JSONException e) {
             // Handle error
         }
     }
-
-
 
 
     public void recordAdRequest() {
@@ -108,9 +84,97 @@ public class IMSEAL {
 
 
 
+    private void logLocalParams() {
+        Log.d(logTag, localParams.toString());
+    }
+
+
+    private void initializeLocalParamsBaseObject(String deviceId){
+        localParams = new JSONObject();
+
+        try {
+            localParams.put("device_id", deviceId);
+            localParams.put("isActive", true);                  // TODO: Use
+            localParams.put("cellular", false);                 // TODO: Use
+            localParams.put("os", "Android");                   // TODO: Use
+            localParams.put("date_created", new Date());
+        } catch (JSONException e){
+            // Handle
+        }
+
+    }
+
+
     // Helper function that will call the location API (referenced further below). Will be called by the initialize method in the background.
-    private void retrieveLocationForSession() {
-        // TODO
+    private void updateLocalParamsFromRemote() {
+
+        configs = new EndpointConfigs();
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(configs.getLocationAPIEndpoint())
+                .addConverterFactory(GsonConverterFactory.create())
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .build();
+
+        APIService apiService = retrofit.create(APIService.class);
+        Call call = apiService.getAPIService();
+
+        call.enqueue(new Callback() {
+            @Override
+            public void onResponse(Call call, Response response) {
+                Log.d("API", "onResponse");
+                if (response.body() != null) {
+                    Log.d(logTag, "Response acquired: " + response.body());
+
+                    String request_ip = ((LocationModel)response.body()).ip;
+                    Log.d(logTag, "Response ip: " + request_ip);
+
+                    try {
+                        if (localParams == null) {
+                            throw new Error("Local Params was null");   // TODO: Handle this workflow
+                        }
+
+                        localParams.put("request_ip", ((LocationModel)response.body()).ip);
+                        localParams.put("continent",  ((LocationModel)response.body()).continent);
+                        localParams.put("country",  ((LocationModel)response.body()).country);
+                        localParams.put("city",  ((LocationModel)response.body()).city);
+                        localParams.put("lat",  ((LocationModel)response.body()).latitude);
+                        localParams.put("long",  ((LocationModel)response.body()).longitude);
+
+
+                        logLocalParams();
+
+
+                    } catch (JSONException e){
+                        // Handle error
+                    }
+
+
+                }
+
+
+            }
+
+            @Override
+            public void onFailure(Call call, Throwable t) {
+                Log.d(logTag, "onFailure with: " + t.getLocalizedMessage());
+
+                try {
+                    if (localParams == null) {
+                        throw new Error("Local Params was null");   // TODO: Handle this workflow
+                    }
+                    localParams.put("request_ip", "12.34.56.78");
+                    localParams.put("continent", "N/A");
+                    localParams.put("country", "N/A");
+                    localParams.put("city", "N/A");
+                    localParams.put("lat", "N/A");
+                    localParams.put("long", "N/A");
+                } catch (JSONException e){
+                    // Handle error
+                }
+            }
+        });
+
     };
 
     // Helper function that will specifically ask for a new created event as JSON using a HTTP POST to the specified path. It should expect a session ID from the remote and save it. If this isn't provided, throw an error up to the listener.
