@@ -3,7 +3,7 @@ import retrofit2.Call;
 import retrofit2.http.GET;
 
 
-public interface APIService {
+public interface LocationAPIService {
         @GET("json/")
         Call<LocationModel> getAPIService();
 }

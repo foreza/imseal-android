@@ -1,5 +1,6 @@
 package com.foreza.imseal;
 
+import android.se.omapi.Session;
 import android.util.Log;
 
 import org.json.JSONException;
@@ -24,6 +25,10 @@ public class IMSEAL {
     IMSEALInterface listener;                                           // TODO: Plug in
 
     private String _currentEventId;
+
+
+    private Retrofit _retrofit;
+    private EventAPIService _service;
     private EndpointConfigs configs;
 
 
@@ -31,9 +36,12 @@ public class IMSEAL {
     }
 
     public void initialize(String uuid, String plc){
+
+        configs = new EndpointConfigs();
         initializeLocalParamsBaseObject(uuid);
         updateLocalParamsWithPlacementID(plc);
         updateLocalParamsFromRemote();
+        retrieveSessionIDForParams(localParams);
 
     }
 
@@ -105,10 +113,50 @@ public class IMSEAL {
     }
 
 
+    private void retrieveSessionIDForParams(JSONObject sessionInfo){
+
+        _retrofit = new Retrofit.Builder()
+                .baseUrl(configs.getSEALAPIEndpoint())
+                .addConverterFactory(GsonConverterFactory.create())
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .build();
+
+        _service = _retrofit.create(EventAPIService.class);
+
+        Call call = _service.initializeWithInfoForSessionID(sessionInfo);
+        call.enqueue(new Callback() {
+            @Override
+            public void onResponse(Call call, Response response) {
+                Log.d(logTag, "Server responded with: " + response.code());
+
+                sessionId = ((SessionModel.SessionResponse)response.body()).session_id;
+
+                if (sessionId != "") {
+
+                    Log.d(logTag, "Server responded with session ID: " + sessionId);
+
+                    // Bubble success up to handler. We are now allowed to send events
+                    listener.initSuccess();
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call call, Throwable t) {
+                Log.e(logTag, "Failed with: " + t.getLocalizedMessage());
+
+                // Bubble error up to the handler
+                listener.initFail(t.getLocalizedMessage());
+            }
+        });
+
+
+
+    }
+
     // Helper function that will call the location API (referenced further below). Will be called by the initialize method in the background.
     private void updateLocalParamsFromRemote() {
 
-        configs = new EndpointConfigs();
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(configs.getLocationAPIEndpoint())
@@ -116,8 +164,8 @@ public class IMSEAL {
                 .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .build();
 
-        APIService apiService = retrofit.create(APIService.class);
-        Call call = apiService.getAPIService();
+        LocationAPIService locationApiService = retrofit.create(LocationAPIService.class);
+        Call call = locationApiService.getAPIService();
 
         call.enqueue(new Callback() {
             @Override
