@@ -17,7 +17,7 @@ public class SessionModel {
 
 
     public class SessionResponse {
-        public String session_id;
+        public String id; // not session_id!
     }
 
 }

@@ -1,13 +1,13 @@
 package com.foreza.imseal;
 
-import android.se.omapi.Session;
+import android.app.Application;
+import android.content.Context;
 import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.Date;
-
+import okhttp3.RequestBody;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
@@ -22,26 +22,27 @@ public class IMSEAL {
     String sessionId = null;
     boolean isInitialized = false;
     JSONObject localParams;
-    IMSEALInterface listener;                                           // TODO: Plug in
 
     private String _currentEventId;
-
-
     private Retrofit _retrofit;
     private EventAPIService _service;
     private EndpointConfigs configs;
+    private IMSEALInterface _listener;
 
 
     public IMSEAL () {
     }
 
-    public void initialize(String uuid, String plc){
+    public void initialize(IMSEALInterface listener, String uuid, String plc){
+
+        _listener = listener;
+
 
         configs = new EndpointConfigs();
         initializeLocalParamsBaseObject(uuid);
         updateLocalParamsWithPlacementID(plc);
         updateLocalParamsFromRemote();
-        retrieveSessionIDForParams(localParams);
+
 
     }
 
@@ -105,7 +106,14 @@ public class IMSEAL {
             localParams.put("isActive", true);                  // TODO: Use
             localParams.put("cellular", false);                 // TODO: Use
             localParams.put("os", "Android");                   // TODO: Use
-            localParams.put("date_created", new Date());
+            localParams.put("placement_id", "N/A");
+            localParams.put("request_ip", "Unknown IP");
+            localParams.put("continent", "Unknown continent");
+            localParams.put("country", "Unknown Country");
+            localParams.put("region", "Unknown Region");
+            localParams.put("city", "Unknown City");
+            localParams.put("lat", "0.0");
+            localParams.put("long", "0.0");
         } catch (JSONException e){
             // Handle
         }
@@ -122,21 +130,27 @@ public class IMSEAL {
                 .build();
 
         _service = _retrofit.create(EventAPIService.class);
+        
+        RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(sessionInfo.toString()));
 
-        Call call = _service.initializeWithInfoForSessionID(sessionInfo);
+        Call call = _service.initializeWithInfoForSessionID(body);
         call.enqueue(new Callback() {
             @Override
             public void onResponse(Call call, Response response) {
                 Log.d(logTag, "Server responded with: " + response.code());
 
-                sessionId = ((SessionModel.SessionResponse)response.body()).session_id;
+                sessionId = ((SessionModel.SessionResponse)response.body()).id;
 
                 if (sessionId != "") {
 
                     Log.d(logTag, "Server responded with session ID: " + sessionId);
 
+
                     // Bubble success up to handler. We are now allowed to send events
-                    listener.initSuccess();
+                    if (_listener != null){
+                        _listener.initSuccess(sessionId);
+                    }
+
                 }
 
             }
@@ -146,7 +160,9 @@ public class IMSEAL {
                 Log.e(logTag, "Failed with: " + t.getLocalizedMessage());
 
                 // Bubble error up to the handler
-                listener.initFail(t.getLocalizedMessage());
+                if (_listener != null){
+                    _listener.initFail(t.getLocalizedMessage());
+                }
             }
         });
 
@@ -156,7 +172,6 @@ public class IMSEAL {
 
     // Helper function that will call the location API (referenced further below). Will be called by the initialize method in the background.
     private void updateLocalParamsFromRemote() {
-
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(configs.getLocationAPIEndpoint())
@@ -185,11 +200,12 @@ public class IMSEAL {
                         localParams.put("request_ip", ((LocationModel)response.body()).ip);
                         localParams.put("continent",  ((LocationModel)response.body()).continent);
                         localParams.put("country",  ((LocationModel)response.body()).country);
+                        localParams.put("region", ((LocationModel)response.body()).region);
                         localParams.put("city",  ((LocationModel)response.body()).city);
                         localParams.put("lat",  ((LocationModel)response.body()).latitude);
                         localParams.put("long",  ((LocationModel)response.body()).longitude);
 
-
+                        retrieveSessionIDForParams(localParams);
                         logLocalParams();
 
 
@@ -207,19 +223,12 @@ public class IMSEAL {
             public void onFailure(Call call, Throwable t) {
                 Log.d(logTag, "onFailure with: " + t.getLocalizedMessage());
 
-                try {
-                    if (localParams == null) {
-                        throw new Error("Local Params was null");   // TODO: Handle this workflow
-                    }
-                    localParams.put("request_ip", "12.34.56.78");
-                    localParams.put("continent", "N/A");
-                    localParams.put("country", "N/A");
-                    localParams.put("city", "N/A");
-                    localParams.put("lat", "N/A");
-                    localParams.put("long", "N/A");
-                } catch (JSONException e){
-                    // Handle error
+                if (localParams == null) {
+                    throw new Error("Local Params was null");   // TODO: Handle this workflow
                 }
+
+                retrieveSessionIDForParams(localParams);
+                logLocalParams();
             }
         });
 
@@ -239,6 +248,8 @@ public class IMSEAL {
     private boolean logAdLoadToRemote(String currentEventId) {
         return false;
     }
+
+
 
 
 

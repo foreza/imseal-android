@@ -7,6 +7,7 @@ public class LocationModel {
     public String city;
     public String latitude;
     public String longitude;
+    public String region;
     public int completed_requests;
 }
 

@@ -2,7 +2,7 @@ package com.foreza.imseal;
 
 public class EndpointConfigs {
     private String _location_api_url = "http://free.ipwhois.io/";
-    private String _seal_api_url = "";
+    private String _seal_api_url = "http://127.0.0.1:3000";
 
     public EndpointConfigs(){ }
 
