@@ -1,8 +1,6 @@
 package com.foreza.seal;
 
 import androidx.appcompat.app.AppCompatActivity;
-
-import android.app.Application;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -25,10 +23,14 @@ public class MainActivity extends AppCompatActivity implements IMSEALInterface {
     }
 
     @Override
-    public void initSuccess(String sessionId) {
+    public void initSuccess(int sessionId) {
                 String msg = "initSuccess reported from activity, session id: " + sessionId;
                 Log.d("Test", msg);
                 Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show();
+
+                // Temporary
+
+                imseal.recordAdRequest();
     }
 
     @Override
@@ -40,11 +42,16 @@ public class MainActivity extends AppCompatActivity implements IMSEALInterface {
 
     @Override
     public void eventLogSuccess() {
+        String msg = "eventLogSuccess";
+        Log.d("Test", msg);
+        Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show();
 
     }
 
     @Override
     public void eventLogFailure() {
-
+        String msg = "eventLogFailure";
+        Log.d("Test", msg);
+        Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show();
     }
 }

@@ -1,11 +1,17 @@
 package com.foreza.imseal;
 
-import android.app.Application;
-import android.content.Context;
 import android.util.Log;
+
+import com.foreza.imseal.models.AdEventModel;
+import com.foreza.imseal.models.LocationModel;
+import com.foreza.imseal.models.SessionModel;
+import com.foreza.imseal.services.EventAPIService;
+import com.foreza.imseal.services.LocationAPIService;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.Date;
 
 import okhttp3.RequestBody;
 import retrofit2.Call;
@@ -14,12 +20,14 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
+import retrofit2.http.POST;
+
 
 public class IMSEAL {
 
     private static final String logTag = "[IMSEAL]";
 
-    String sessionId = null;
+    int sessionId;
     boolean isInitialized = false;
     JSONObject localParams;
 
@@ -75,10 +83,55 @@ public class IMSEAL {
     }
 
 
+    public void util_sendAdEventCall(Call call){
+
+        call.enqueue(new Callback() {
+            @Override
+            public void onResponse(Call call, Response response) {
+
+                Log.d(logTag, "Server responded with: " + response.code());
+
+                // Bubble success up to handler. We are now allowed to send events
+                if (_listener != null){
+                    _listener.eventLogSuccess();
+                }
+
+
+
+            }
+
+            @Override
+            public void onFailure(Call call, Throwable t) {
+
+                Log.e(logTag, "Failed with: " + t.getLocalizedMessage());
+
+                // Bubble success up to handler. We are now allowed to send events
+                if (_listener != null){
+                    _listener.eventLogFailure();
+                }
+
+            }
+        });
+
+    }
+
     public void recordAdRequest() {
-        // TODO
         Log.d(logTag, "recordAdRequest");
-        // TODO
+        JSONObject event = new JSONObject();
+
+        //        public IMSEALAdRequestEvent(int session_id) {
+//            timestamp = new Date();
+//            this.session_id = session_id;
+        try {
+            event.put("session_id", sessionId);
+            event.put("timestamp", new Date());
+            RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
+            util_sendAdEventCall(_service.logEventForAdRequest(body));
+
+        } catch (JSONException e){
+
+        }
+
     }
 
     public void recordAdLoaded() {
@@ -139,18 +192,19 @@ public class IMSEAL {
             public void onResponse(Call call, Response response) {
                 Log.d(logTag, "Server responded with: " + response.code());
 
-                sessionId = ((SessionModel.SessionResponse)response.body()).id;
 
-                if (sessionId != "") {
-
-                    Log.d(logTag, "Server responded with session ID: " + sessionId);
-
+                try {
+                    sessionId = Integer.parseInt(((SessionModel.SessionResponse)response.body()).id);
 
                     // Bubble success up to handler. We are now allowed to send events
                     if (_listener != null){
                         _listener.initSuccess(sessionId);
                     }
 
+                    Log.d(logTag, "Server responded with session ID: " + sessionId);
+
+                } catch (NumberFormatException e){
+                    // Handle
                 }
 
             }

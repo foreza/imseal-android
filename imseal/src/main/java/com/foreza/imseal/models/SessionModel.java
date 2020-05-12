@@ -1,4 +1,4 @@
-package com.foreza.imseal;
+package com.foreza.imseal.models;
 
 public class SessionModel {
 
