@@ -19,7 +19,7 @@ public class MainActivity extends AppCompatActivity implements IMSEALInterface {
         setContentView(R.layout.activity_main);
 
         imseal = new IMSEAL();
-        imseal.initialize(this,"hello world", "380000");
+        imseal.initialize(this,"hello world");
     }
 
     @Override

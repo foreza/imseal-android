@@ -27,115 +27,54 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class IMSEAL {
 
+    /* Public attributes */
+
+
+    /* Constants */
     private static final String logTag = "[IMSEAL]";
-
     private static final int DEFAULT_CURRENT_EVENT_ID = -1;
-    public static final String ERROR_REASON_AD_REQUEST_NOT_MADE =  "Did you try beginning an ad request with recordAdRequest()?";
+    private static final String ERROR_REASON_AD_REQUEST_NOT_MADE =  "Did you try beginning an ad request with recordAdRequest()?";
 
-
-    int sessionId;
-    boolean isInitialized = false;
-    JSONObject localParams;
-
-    private int _currentEventId = DEFAULT_CURRENT_EVENT_ID;
-    private Retrofit _retrofit;
-    private EventAPIService _service;
-    private EndpointConfigs configs;
+    /* Private attributes */
+    public boolean _isInitialized;
+    private int _sessionId;
+    private int _currentEventId;
+    private JSONObject _localParams;
     private IMSEALInterface _listener;
 
+    private Retrofit _retrofit;
+    private EventAPIService _service;
 
-    public IMSEAL () {
-    }
 
-    public void initialize(IMSEALInterface listener, String uuid, String plc){
+    public IMSEAL () {}
 
+    /* Public methods */
+
+    public void initialize(IMSEALInterface listener, String uuid){
+        _isInitialized = false;
         _listener = listener;
+        _service = util_configureEventRetrofitService(EndpointConfigs._seal_api_url);
+        _currentEventId = DEFAULT_CURRENT_EVENT_ID;
+        _localParams = util_initializeLocalParamsBaseObject(uuid);
 
-
-        configs = new EndpointConfigs();
-        initializeLocalParamsBaseObject(uuid);
-        updateLocalParamsWithPlacementID(plc);
-        updateLocalParamsFromRemote();
-
-
+        // Trigger call to location API, then to SEAL API
+        // Update the localParams object if successful
+        util_fetchLocationParamsFromRemote();
     }
+
 
     public boolean isInitialized(){
-        Log.i(logTag, "isInitialized");
-        return isInitialized;
+        return _isInitialized;
     }
 
 
-    // GETTERs TODO: Add more getters
-
-    public String getPlacementID() {
-
-        try {
-            return (localParams.get("placement_id")).toString();        // TODO: Handle this better
-        } catch (JSONException e) {
-            return "00000000";                                          // TODO: Handle this better
-        }
-
-    }
-
-    // Setters (TODO: Add additional settings for the local params)
-
-    public void updateLocalParamsWithPlacementID(String plc){
-        try {
-            localParams.put("placement_id", plc);
-        } catch (JSONException e) {
-            // Handle error
-        }
-    }
-
-
-    private boolean util_checkForExistingEventID(){
-        if (_currentEventId == -1 || _currentEventId == 0) {
-            Log.e(logTag, ERROR_REASON_AD_REQUEST_NOT_MADE);
-            return false;
-        }
-
-        return true;
-    }
-
-
-    private void util_sendAdEventCall(Call<String> call){
-
-
-        call.enqueue(new Callback<String>() {
-
-            @Override
-            public void onResponse(Call<String> call, Response<String> response) {
-                Log.d(logTag, "util_sendAdEventCall - Server responded with: " + response.code());
-
-                // Bubble success up to handler. We are now allowed to send events
-                if (_listener != null){
-                    _listener.eventLogSuccess();
-                }
-
-            }
-
-            @Override
-            public void onFailure(Call call, Throwable t) {
-
-                Log.e(logTag, "util_sendAdEventCall - Failed with: " + t.getLocalizedMessage());
-
-                // Bubble success up to handler. We are now allowed to send events
-                if (_listener != null){
-                    _listener.eventLogFailure();
-                }
-
-            }
-        });
-
-    }
     public void recordAdRequest() {
         Log.d(logTag, "recordAdRequest");
 
         JSONObject event = new JSONObject();
 
         try {
-            event.put("session_id", sessionId);
+            event.put("session_id", _sessionId);
             event.put("timestamp", new Date());
             RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
 
@@ -183,6 +122,7 @@ public class IMSEAL {
 
     }
 
+
     public void recordAdLoaded() {
 
         if (!util_checkForExistingEventID()) {
@@ -211,6 +151,7 @@ public class IMSEAL {
 
 
     }
+
 
     public void recordAdNoFill(String reason_string) {
 
@@ -245,49 +186,101 @@ public class IMSEAL {
 
 
 
-    private void logLocalParams() {
-        Log.d(logTag, localParams.toString());
-    }
+
+    /* Private class methods */
 
 
-    private void initializeLocalParamsBaseObject(String deviceId){
-        localParams = new JSONObject();
-
-        try {
-            localParams.put("device_id", deviceId);
-            localParams.put("isActive", true);                  // TODO: Use
-            localParams.put("cellular", false);                 // TODO: Use
-            localParams.put("os", "Android");                   // TODO: Use
-            localParams.put("placement_id", "N/A");
-            localParams.put("request_ip", "Unknown IP");
-            localParams.put("continent", "Unknown continent");
-            localParams.put("country", "Unknown Country");
-            localParams.put("region", "Unknown Region");
-            localParams.put("city", "Unknown City");
-            localParams.put("lat", "0.0");
-            localParams.put("long", "0.0");
-        } catch (JSONException e){
-            // Handle
+    private boolean util_checkForExistingEventID(){
+        if (_currentEventId == -1 || _currentEventId == 0) {
+            Log.e(logTag, ERROR_REASON_AD_REQUEST_NOT_MADE);
+            return false;
         }
+        return true;
+    }
+
+
+    private void util_sendAdEventCall(Call<String> call){
+
+
+        call.enqueue(new Callback<String>() {
+
+            @Override
+            public void onResponse(Call<String> call, Response<String> response) {
+                Log.d(logTag, "util_sendAdEventCall - Server responded with: " + response.code());
+
+                // Bubble success up to handler. We are now allowed to send events
+                if (_listener != null){
+                    _listener.eventLogSuccess();
+                }
+
+            }
+
+            @Override
+            public void onFailure(Call call, Throwable t) {
+
+                Log.e(logTag, "util_sendAdEventCall - Failed with: " + t.getLocalizedMessage());
+
+                // Bubble success up to handler. We are now allowed to send events
+                if (_listener != null){
+                    _listener.eventLogFailure();
+                }
+
+            }
+        });
 
     }
 
 
-    private void retrieveSessionIDForParams(JSONObject sessionInfo){
-
+    private EventAPIService util_configureEventRetrofitService(String endpoint){
 
         Gson gson = new GsonBuilder()
                 .setLenient()
                 .create();
 
         _retrofit = new Retrofit.Builder()
-                .baseUrl(configs.getSEALAPIEndpoint())
+                .baseUrl(endpoint)
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .build();
 
-        _service = _retrofit.create(EventAPIService.class);
-        
+        return _retrofit.create(EventAPIService.class);
+    }
+
+
+    private JSONObject util_initializeLocalParamsBaseObject(String deviceId){
+
+        JSONObject params = new JSONObject();
+
+        try {
+            params.put("device_id", deviceId);
+            params.put("isActive", true);                  // TODO: Use
+            params.put("cellular", false);                 // TODO: Use
+            params.put("os", "Android");                   // TODO: Use
+            params.put("plc", "380000");                   // TODO: Use
+            params.put("placement_id", "N/A");
+            params.put("request_ip", "Unknown IP");
+            params.put("continent", "Unknown continent");
+            params.put("country", "Unknown Country");
+            params.put("region", "Unknown Region");
+            params.put("city", "Unknown City");
+            params.put("lat", "0.0");
+            params.put("long", "0.0");
+        } catch (JSONException e){
+            // Handle
+        }
+
+        return params;
+    }
+
+
+    private void util_retrieveSessionIDForParams(JSONObject sessionInfo){
+
+        if (_service == null){
+            _listener.initFail("Service was not initialized!");
+            return;
+        }
+
+
         RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(sessionInfo.toString()));
 
         Call call = _service.initializeWithInfoForSessionID(body);
@@ -304,14 +297,16 @@ public class IMSEAL {
                 }
 
                 try {
-                    sessionId = Integer.parseInt(((SessionModel.SessionResponse)response.body()).id);
+                    _sessionId = Integer.parseInt(((SessionModel.SessionResponse)response.body()).id);
 
                     // Bubble success up to handler. We are now allowed to send events
                     if (_listener != null){
-                        _listener.initSuccess(sessionId);
+                        _listener.initSuccess(_sessionId);
                     }
 
-                    Log.d(logTag, "Server responded with session ID: " + sessionId);
+                    _isInitialized = true;
+                    Log.d(logTag, "Server responded with session ID: " + _sessionId);
+
 
                 } catch (NumberFormatException e){
                     // Handle
@@ -327,6 +322,9 @@ public class IMSEAL {
                 if (_listener != null){
                     _listener.initFail(t.getLocalizedMessage());
                 }
+
+                _isInitialized = false;
+
             }
         });
 
@@ -334,13 +332,12 @@ public class IMSEAL {
 
     }
 
+
     // Helper function that will call the location API (referenced further below). Will be called by the initialize method in the background.
-    private void updateLocalParamsFromRemote() {
-
-
+    private void util_fetchLocationParamsFromRemote() {
 
         Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(configs.getLocationAPIEndpoint())
+                .baseUrl(EndpointConfigs._location_api_url)
                 .addConverterFactory(GsonConverterFactory.create())
                 .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .build();
@@ -359,20 +356,23 @@ public class IMSEAL {
                     Log.d(logTag, "Response ip: " + request_ip);
 
                     try {
-                        if (localParams == null) {
+                        if (_localParams == null) {
                             throw new Error("Local Params was null");   // TODO: Handle this workflow
                         }
 
-                        localParams.put("request_ip", ((LocationModel)response.body()).ip);
-                        localParams.put("continent",  ((LocationModel)response.body()).continent);
-                        localParams.put("country",  ((LocationModel)response.body()).country);
-                        localParams.put("region", ((LocationModel)response.body()).region);
-                        localParams.put("city",  ((LocationModel)response.body()).city);
-                        localParams.put("lat",  ((LocationModel)response.body()).latitude);
-                        localParams.put("long",  ((LocationModel)response.body()).longitude);
+                        LocationModel l = (LocationModel)response.body();
 
-                        retrieveSessionIDForParams(localParams);
-                        logLocalParams();
+                        _localParams.put("request_ip", l.ip);
+                        _localParams.put("continent",  l.continent);
+                        _localParams.put("country",  l.country);
+                        _localParams.put("region", l.region);
+                        _localParams.put("city",  l.city);
+                        _localParams.put("lat",  l.latitude);
+                        _localParams.put("long",  l.longitude);
+
+                        util_retrieveSessionIDForParams(_localParams);
+
+                        helper_logLocalParams();
 
 
                     } catch (JSONException e){
@@ -389,47 +389,19 @@ public class IMSEAL {
             public void onFailure(Call call, Throwable t) {
                 Log.d(logTag, "onFailure with: " + t.getLocalizedMessage());
 
-                if (localParams == null) {
+                if (_localParams == null) {
                     throw new Error("Local Params was null");   // TODO: Handle this workflow
                 }
 
-                retrieveSessionIDForParams(localParams);
-                logLocalParams();
+                util_retrieveSessionIDForParams(_localParams);
+                helper_logLocalParams();
             }
         });
 
     };
 
-    // Helper function that will specifically ask for a new created event as JSON using a HTTP POST to the specified path. It should expect a session ID from the remote and save it. If this isn't provided, throw an error up to the listener.
-    private boolean logAdRequestToRemote() {
-        return false;
+
+    private void helper_logLocalParams() {
+        Log.d(logTag, _localParams.toString());
     }
-
-    // Helper function that will log the error to the remote. Would be expected for the "no ad fill" use case. No event ID, no log.
-    private boolean logAdErrorToRemote(Error e, String currentEventId) {
-        return false;
-    }
-
-    // Helper function that will log a successful ad load to the remote. Would be expected if an ad was returned. No event id, no log.
-    private boolean logAdLoadToRemote(String currentEventId) {
-        return false;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
