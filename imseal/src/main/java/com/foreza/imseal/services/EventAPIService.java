@@ -7,10 +7,9 @@ import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.Headers;
 import retrofit2.http.POST;
+import retrofit2.http.Path;
 
 public interface EventAPIService {
-
-    @Headers( "Content-Type: application/json; charset=utf-8")
 
     @POST("/sessions")
     Call<SessionModel.SessionResponse> initializeWithInfoForSessionID(@Body RequestBody session);
@@ -19,8 +18,8 @@ public interface EventAPIService {
     Call<AdEventModel.IMSEALAdResponseEvent> logEventForAdRequest(@Body RequestBody event);
 
     @POST("/events/{event_id}")
-    Call<AdEventModel> logEventForAdLoad(@Body RequestBody event);
+    Call<String> logEventForAdLoad(@Path("event_id") int event_id, @Body RequestBody event);
 
-    @POST("/event/{event_id}")
-    Call<AdEventModel> logEventForAdNoFill(@Body RequestBody event);
+    @POST("/events/{event_id}")
+    Call<String> logEventForAdNoFill(@Path("event_id") int event_id, @Body RequestBody event);
 }

@@ -41,6 +41,20 @@ public class MainActivity extends AppCompatActivity implements IMSEALInterface {
     }
 
     @Override
+    public void startEventLogSuccess() {
+
+        imseal.recordAdLoaded();
+        imseal.recordAdNoFill("some nights...");
+
+
+    }
+
+    @Override
+    public void startEventLogFail() {
+
+    }
+
+    @Override
     public void eventLogSuccess() {
         String msg = "eventLogSuccess";
         Log.d("Test", msg);

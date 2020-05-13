@@ -7,6 +7,8 @@ import com.foreza.imseal.models.LocationModel;
 import com.foreza.imseal.models.SessionModel;
 import com.foreza.imseal.services.EventAPIService;
 import com.foreza.imseal.services.LocationAPIService;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -20,18 +22,22 @@ import retrofit2.Response;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
-import retrofit2.http.POST;
+
 
 
 public class IMSEAL {
 
     private static final String logTag = "[IMSEAL]";
 
+    private static final int DEFAULT_CURRENT_EVENT_ID = -1;
+    public static final String ERROR_REASON_AD_REQUEST_NOT_MADE =  "Did you try beginning an ad request with recordAdRequest()?";
+
+
     int sessionId;
     boolean isInitialized = false;
     JSONObject localParams;
 
-    private String _currentEventId;
+    private int _currentEventId = DEFAULT_CURRENT_EVENT_ID;
     private Retrofit _retrofit;
     private EventAPIService _service;
     private EndpointConfigs configs;
@@ -83,27 +89,36 @@ public class IMSEAL {
     }
 
 
-    public void util_sendAdEventCall(Call call){
+    private boolean util_checkForExistingEventID(){
+        if (_currentEventId == -1 || _currentEventId == 0) {
+            Log.e(logTag, ERROR_REASON_AD_REQUEST_NOT_MADE);
+            return false;
+        }
 
-        call.enqueue(new Callback() {
+        return true;
+    }
+
+
+    private void util_sendAdEventCall(Call<String> call){
+
+
+        call.enqueue(new Callback<String>() {
+
             @Override
-            public void onResponse(Call call, Response response) {
-
-                Log.d(logTag, "Server responded with: " + response.code());
+            public void onResponse(Call<String> call, Response<String> response) {
+                Log.d(logTag, "util_sendAdEventCall - Server responded with: " + response.code());
 
                 // Bubble success up to handler. We are now allowed to send events
                 if (_listener != null){
                     _listener.eventLogSuccess();
                 }
 
-
-
             }
 
             @Override
             public void onFailure(Call call, Throwable t) {
 
-                Log.e(logTag, "Failed with: " + t.getLocalizedMessage());
+                Log.e(logTag, "util_sendAdEventCall - Failed with: " + t.getLocalizedMessage());
 
                 // Bubble success up to handler. We are now allowed to send events
                 if (_listener != null){
@@ -114,34 +129,118 @@ public class IMSEAL {
         });
 
     }
-
     public void recordAdRequest() {
         Log.d(logTag, "recordAdRequest");
+
         JSONObject event = new JSONObject();
 
-        //        public IMSEALAdRequestEvent(int session_id) {
-//            timestamp = new Date();
-//            this.session_id = session_id;
         try {
             event.put("session_id", sessionId);
             event.put("timestamp", new Date());
             RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
-            util_sendAdEventCall(_service.logEventForAdRequest(body));
+
+            Call newAdRequestCall = _service.logEventForAdRequest(body);
+
+            newAdRequestCall.enqueue(new Callback() {
+                @Override
+                public void onResponse(Call call, Response response) {
+
+                    Log.d(logTag, "Server responded with: " + response.code());
+
+                    try {
+                        _currentEventId = Integer.parseInt(((AdEventModel.IMSEALAdResponseEvent)response.body()).event_id);
+
+                        // Bubble success up to handler. We are now allowed to send events
+                        if (_listener != null){
+                            _listener.startEventLogSuccess();
+                        }
+
+                        Log.d(logTag, "Server responded with new event ID: " + _currentEventId);
+
+                    } catch (NumberFormatException e){
+                        // Handle
+                    }
+                }
+
+                @Override
+                public void onFailure(Call call, Throwable t) {
+
+                    Log.e(logTag, "Failed with: " + t.getLocalizedMessage());
+                    _currentEventId = DEFAULT_CURRENT_EVENT_ID;
+
+                    // Bubble success up to handler. We are now allowed to send events
+                    if (_listener != null){
+                        _listener.startEventLogFail();
+                    }
+
+                }
+            });
+
 
         } catch (JSONException e){
-
+            // TODO: Handle
         }
 
     }
 
     public void recordAdLoaded() {
-        // TODO
-        Log.d(logTag, "recordAdLoaded");
+
+        if (!util_checkForExistingEventID()) {
+            if (_listener != null){
+                _listener.eventLogFailure();
+            }
+            return;
+        }
+
+        JSONObject event = new JSONObject();
+
+        try {
+            event.put("type", 1);
+            event.put("event_id", _currentEventId);
+            event.put("timestamp", new Date());
+
+            RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
+            Call<String> eventCall = _service.logEventForAdLoad(_currentEventId, body);
+
+            util_sendAdEventCall(eventCall);
+            Log.d(logTag, "recordAdLoaded");
+
+        } catch (JSONException e){
+            // TODO: Handle
+        }
+
+
     }
 
-    public void recordAdError(String errString) {
+    public void recordAdNoFill(String reason_string) {
+
+        if (!util_checkForExistingEventID()) {
+            if (_listener != null){
+                _listener.eventLogFailure();
+            }
+            return;
+        }
+
+
+        JSONObject event = new JSONObject();
+
+        try {
+            event.put("type", 2);
+            event.put("event_id", _currentEventId);
+            event.put("timestamp", new Date());
+            event.put("reason_string", reason_string);
+
+            RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
+            Call<String> eventCall = _service.logEventForAdNoFill(_currentEventId, body);
+            util_sendAdEventCall(eventCall);
+            Log.d(logTag, "recordAdNoFill");
+
+        } catch (JSONException e){
+            // TODO: Handle
+        }
+
+
         // TODO
-        Log.d(logTag, "recordAdError");
     }
 
 
@@ -176,9 +275,14 @@ public class IMSEAL {
 
     private void retrieveSessionIDForParams(JSONObject sessionInfo){
 
+
+        Gson gson = new GsonBuilder()
+                .setLenient()
+                .create();
+
         _retrofit = new Retrofit.Builder()
                 .baseUrl(configs.getSEALAPIEndpoint())
-                .addConverterFactory(GsonConverterFactory.create())
+                .addConverterFactory(GsonConverterFactory.create(gson))
                 .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .build();
 
@@ -192,6 +296,12 @@ public class IMSEAL {
             public void onResponse(Call call, Response response) {
                 Log.d(logTag, "Server responded with: " + response.code());
 
+                if (response.code() != 200){
+                    if (_listener != null){
+                        _listener.initFail("Response code was not 200 - check!");
+                    }
+                    return;
+                }
 
                 try {
                     sessionId = Integer.parseInt(((SessionModel.SessionResponse)response.body()).id);
@@ -226,6 +336,8 @@ public class IMSEAL {
 
     // Helper function that will call the location API (referenced further below). Will be called by the initialize method in the background.
     private void updateLocalParamsFromRemote() {
+
+
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(configs.getLocationAPIEndpoint())
