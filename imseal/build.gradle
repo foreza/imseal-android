@@ -38,19 +38,18 @@ ext {
 
     publishedGroupId = 'com.foreza'
     libraryName = 'imsealsdk'
-    artifact = 'diagonalscrollview'
+    artifact = 'imsealsdk'
 
     libraryDescription = "This'll make measuring ad network latency a whiz!"
 
     siteUrl = 'https://github.com/foreza/imseal-android'
     gitUrl = 'https://github.com/foreza/imseal-android.git'
 
-    libraryVersion = '0.0.3'
+    libraryVersion = '0.0.4'
 
     developerId = 'foreza'
     developerName = 'Jason C'
     developerEmail = 'jason.chiu@inmobi.com'
-
     licenseName = 'The Apache Software License, Version 2.0'
     licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
     allLicenses = ["Apache-2.0"]
