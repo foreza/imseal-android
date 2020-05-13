@@ -1,4 +1,7 @@
 apply plugin: 'com.android.library'
+apply plugin: 'maven-publish'
+apply plugin: 'com.jfrog.bintray'
+apply plugin: 'com.github.dcendents.android-maven'
 
 android {
     compileSdkVersion 29
@@ -8,7 +11,7 @@ android {
         minSdkVersion 21
         targetSdkVersion 29
         versionCode 1
-        versionName "1.0"
+        versionName "0.0.3"
         consumerProguardFiles 'consumer-rules.pro'
     }
 
@@ -27,6 +30,30 @@ dependencies {
     implementation 'com.squareup.retrofit2:retrofit:2.4.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.4.0'
     implementation 'com.squareup.retrofit2:adapter-rxjava2:2.4.0'
+}
+
+ext {
+    bintrayRepo = 'imsealsdk'
+    bintrayName = 'IMSEALSDK'
+
+    publishedGroupId = 'com.foreza'
+    libraryName = 'imsealsdk'
+    artifact = 'diagonalscrollview'
+
+    libraryDescription = "This'll make measuring ad network latency a whiz!"
+
+    siteUrl = 'https://github.com/foreza/imseal-android'
+    gitUrl = 'https://github.com/foreza/imseal-android.git'
+
+    libraryVersion = '0.0.3'
+
+    developerId = 'foreza'
+    developerName = 'Jason C'
+    developerEmail = 'jason.chiu@inmobi.com'
+
+    licenseName = 'The Apache Software License, Version 2.0'
+    licenseUrl = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+    allLicenses = ["Apache-2.0"]
 }
 
 apply from: 'publish.gradle'
