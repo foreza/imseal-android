@@ -75,7 +75,7 @@ public class IMSEAL {
 
         try {
             event.put("session_id", _sessionId);
-            event.put("timestamp", new Date());
+            event.put("timestamp", util_getTimeStamp());
             RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
 
             Call newAdRequestCall = _service.logEventForAdRequest(body);
@@ -137,7 +137,7 @@ public class IMSEAL {
         try {
             event.put("type", 1);
             event.put("event_id", _currentEventId);
-            event.put("timestamp", new Date());
+            event.put("timestamp", util_getTimeStamp());
 
             RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
             Call<String> eventCall = _service.logEventForAdLoad(_currentEventId, body);
@@ -168,7 +168,7 @@ public class IMSEAL {
         try {
             event.put("type", 2);
             event.put("event_id", _currentEventId);
-            event.put("timestamp", new Date());
+            event.put("timestamp", util_getTimeStamp());
             event.put("reason_string", reason_string);
 
             RequestBody body = RequestBody.create(okhttp3.MediaType.parse("application/json; charset=utf-8"),(event.toString()));
@@ -400,6 +400,10 @@ public class IMSEAL {
 
     };
 
+
+    private long util_getTimeStamp(){
+        return System.currentTimeMillis();
+    }
 
     private void helper_logLocalParams() {
         Log.d(logTag, _localParams.toString());

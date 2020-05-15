@@ -45,7 +45,7 @@ ext {
     siteUrl = 'https://github.com/foreza/imseal-android'
     gitUrl = 'https://github.com/foreza/imseal-android.git'
 
-    libraryVersion = '0.0.4'
+    libraryVersion = '0.0.4'    // UPDATE THIS
 
     developerId = 'foreza'
     developerName = 'Jason C'

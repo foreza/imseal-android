@@ -8,10 +8,14 @@ import android.widget.Toast;
 import com.foreza.imseal.IMSEAL;
 import com.foreza.imseal.IMSEALInterface;
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 
 public class MainActivity extends AppCompatActivity implements IMSEALInterface {
 
     IMSEAL imseal;
+    Timer timer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -20,6 +24,8 @@ public class MainActivity extends AppCompatActivity implements IMSEALInterface {
 
         imseal = new IMSEAL();
         imseal.initialize(this,"hello world");
+
+        timer = new Timer();
     }
 
     @Override
@@ -43,8 +49,12 @@ public class MainActivity extends AppCompatActivity implements IMSEALInterface {
     @Override
     public void startEventLogSuccess() {
 
-        imseal.recordAdLoaded();
-        imseal.recordAdNoFill("some nights...");
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                imseal.recordAdLoaded();
+            }
+        }, 1000);
 
 
     }
