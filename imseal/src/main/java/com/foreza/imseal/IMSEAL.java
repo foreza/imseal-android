@@ -1,5 +1,6 @@
 package com.foreza.imseal;
 
+import android.app.Activity;
 import android.util.Log;
 
 import com.foreza.imseal.models.AdEventModel;
@@ -33,14 +34,18 @@ public class IMSEAL {
     /* Constants */
     private static final String logTag = "[IMSEAL]";
     private static final int DEFAULT_CURRENT_EVENT_ID = -1;
+
+    private static final String ERROR_HIGHLIGHT = "********************************************************************************";
     private static final String ERROR_REASON_AD_REQUEST_NOT_MADE =  "Did you try beginning an ad request with recordAdRequest()?";
+    private static final String ERROR_REASON_LISTENER_NOT_IMPLEMENTED =  "To make full use of IMSEAL, please consider implementing IMSEALEventListener and the required interface methods.";
+    private static final String ERROR_REASON_INSTANCE_NOT_INITIALIZED =  "Did you init() the IMSEALSDK instance? \nEvent logging is disabled until init is performed.";
 
     /* Private attributes */
     public boolean _isInitialized;
     private int _sessionId;
     private int _currentEventId;
     private JSONObject _localParams;
-    private IMSEALInterface _listener;
+    private IMSEALEventListener _listener;
 
     private Retrofit _retrofit;
     private EventAPIService _service;
@@ -50,9 +55,17 @@ public class IMSEAL {
 
     /* Public methods */
 
-    public void initialize(IMSEALInterface listener, String uuid){
+    public void initialize(Activity context, String uuid){
+
         _isInitialized = false;
-        _listener = listener;
+
+        try {
+            _listener = (IMSEALEventListener) context;
+        } catch (ClassCastException e){
+            Log.e(logTag, helper_constructFailLogString(ERROR_REASON_LISTENER_NOT_IMPLEMENTED));
+        }
+
+
         _service = util_configureEventRetrofitService(EndpointConfigs._seal_api_url);
         _currentEventId = DEFAULT_CURRENT_EVENT_ID;
         _localParams = util_initializeLocalParamsBaseObject(uuid);
@@ -70,6 +83,12 @@ public class IMSEAL {
 
     public void recordAdRequest() {
         Log.d(logTag, "recordAdRequest");
+
+        if (!_isInitialized){
+            helper_logInitFailReason();
+            helper_logPostEventFailureToListener();
+            return;
+        }
 
         JSONObject event = new JSONObject();
 
@@ -125,10 +144,13 @@ public class IMSEAL {
 
     public void recordAdLoaded() {
 
+        if (!_isInitialized){
+            helper_logInitFailReason();
+            return;
+        }
+
         if (!util_checkForExistingEventID()) {
-            if (_listener != null){
-                _listener.eventLogFailure();
-            }
+            helper_logPostEventFailureToListener();
             return;
         }
 
@@ -155,10 +177,13 @@ public class IMSEAL {
 
     public void recordAdNoFill(String reason_string) {
 
+        if (!_isInitialized){
+            helper_logInitFailReason();
+            return;
+        }
+
         if (!util_checkForExistingEventID()) {
-            if (_listener != null){
-                _listener.eventLogFailure();
-            }
+            helper_logPostEventFailureToListener();
             return;
         }
 
@@ -192,7 +217,7 @@ public class IMSEAL {
 
     private boolean util_checkForExistingEventID(){
         if (_currentEventId == -1 || _currentEventId == 0) {
-            Log.e(logTag, ERROR_REASON_AD_REQUEST_NOT_MADE);
+            Log.e(logTag, helper_constructFailLogString(ERROR_REASON_AD_REQUEST_NOT_MADE));
             return false;
         }
         return true;
@@ -299,12 +324,12 @@ public class IMSEAL {
                 try {
                     _sessionId = Integer.parseInt(((SessionModel.SessionResponse)response.body()).id);
 
+                    _isInitialized = true;
                     // Bubble success up to handler. We are now allowed to send events
                     if (_listener != null){
                         _listener.initSuccess(_sessionId);
                     }
-
-                    _isInitialized = true;
+                    
                     Log.d(logTag, "Server responded with session ID: " + _sessionId);
 
 
@@ -401,9 +426,28 @@ public class IMSEAL {
     };
 
 
-    private long util_getTimeStamp(){
+
+    private long util_getTimeStamp() {
         return System.currentTimeMillis();
     }
+
+
+    private void helper_logInitFailReason(){
+        Log.e(logTag, helper_constructFailLogString(ERROR_REASON_INSTANCE_NOT_INITIALIZED));
+    }
+
+
+    private String helper_constructFailLogString(String msg){
+        return " \n" + ERROR_HIGHLIGHT +"\n" +  msg + "\n" + ERROR_HIGHLIGHT + "\n";
+    }
+
+
+    private void helper_logPostEventFailureToListener(){
+        if (_listener != null){
+            _listener.eventLogFailure();
+        }
+    }
+
 
     private void helper_logLocalParams() {
         Log.d(logTag, _localParams.toString());

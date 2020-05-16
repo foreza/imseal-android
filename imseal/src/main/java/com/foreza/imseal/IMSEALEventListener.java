@@ -1,6 +1,6 @@
 package com.foreza.imseal;
 
-public interface IMSEALInterface {
+public interface IMSEALEventListener {
 
     void initSuccess(int sessionId);
     void initFail(String errString);

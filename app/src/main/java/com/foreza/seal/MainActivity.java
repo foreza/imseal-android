@@ -6,13 +6,13 @@ import android.util.Log;
 import android.widget.Toast;
 
 import com.foreza.imseal.IMSEAL;
-import com.foreza.imseal.IMSEALInterface;
+import com.foreza.imseal.IMSEALEventListener;
 
 import java.util.Timer;
 import java.util.TimerTask;
 
 
-public class MainActivity extends AppCompatActivity implements IMSEALInterface {
+public class MainActivity extends AppCompatActivity implements IMSEALEventListener {
 
     IMSEAL imseal;
     Timer timer;
